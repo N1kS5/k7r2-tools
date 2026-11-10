@@ -1,0 +1,44 @@
+name: Monitor Moov
+
+on:
+  schedule:
+    - cron: '0 11 * * *'  # 8am Argentina (UTC-3)
+  workflow_dispatch:       # permite correrlo a mano desde GitHub
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependencias
+        run: |
+          pip install playwright requests
+          playwright install chromium
+          playwright install-deps chromium
+
+      - name: Correr monitor
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python monitor.py
+
+      - name: Guardar snapshot
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          for dir in moov dexter cristobal zeus; do
+            [ -d "$dir" ] && git add "$dir"/*.json
+          done
+          git diff --cached --quiet || git commit -m "update snapshot"
+          git push
